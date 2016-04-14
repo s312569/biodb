@@ -22,9 +22,19 @@
 ;; api
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmulti table-spec (fn [q] (:type q)))
-(defmulti prep-sequences (fn [q] (:type q)))
-(defmulti restore-sequence (fn [q] (:type q)))
+(defmulti table-spec
+  "Returns a vector of vectors specifying a table spec for creating
+  tables using clojure.java.jdbc. For binary fields returns a spec
+  with the :binary keyword instead of database specific data
+  type (biodb sort this out itself)."
+  (fn [q] (:type q)))
+(defmulti prep-sequences
+  "Returns collection of hashmaps representing rows in the database."
+  (fn [q] (:type q)))
+(defmulti restore-sequence
+  "Takes a database row and returns a hashmap representing the
+  biological sequence."
+  (fn [q] (:type q)))
 
 (defn db-spec
   "Takes a map of parameters and returns a database spec. Currently
@@ -41,10 +51,21 @@
                   :subprotocol "postgresql"
                   :subname sn
                   :user user
-                  :password password}))
+                  :password password
+                  :dbtype :postgres}))
     :sqlite {:classname   "org.sqlite.JDBC"
              :subprotocol "sqlite"
-             :subname     dbname}))
+             :subname     dbname
+             :dbtype :sqlite}))
+
+(defn- binary-fields
+  [db type]
+  (let [r (table-spec {:type type})
+        bin (condp = (:dbtype db) :postgres :bytea :sqlite :blob)]
+    (into [] (map #(if (= :binary (nth % 1))
+                     (assoc % 1 bin)
+                     %))
+          r)))
 
 (defn create-table!
   "Given a database spec, table name and a type creates a table in the
@@ -55,7 +76,7 @@
   methods."
   [db table type]
   (let [t (if (keyword? table) (name table) table)]
-    (db-do-commands db (create-table-ddl t (table-spec {:type type})))))
+    (db-do-commands db (create-table-ddl t (binary-fields db type)))))
 
 (defn insert-sequences!
   "Given a database spec, table name, sequence type and a collection
