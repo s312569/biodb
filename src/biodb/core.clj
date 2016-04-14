@@ -64,8 +64,7 @@
   table-spec, prep-sequences and restore-sequences. See clj-fasta for
   an example of these methods."
   [db table type coll]
-  (dorun (->> (prep-sequences {:coll coll :type type})
-              (insert-multi! db table))))
+  (dorun (insert-multi! db table (prep-sequences {:coll coll :type type}) {:transaction? true})))
 
 (defn get-sequences
   "Given a database spec, table name, sequence type and a collection
@@ -101,4 +100,9 @@
   (query db q
          {:row-fn #(restore-sequence (assoc % :type type))
           :result-set-fn func}))
+
+(defn close-pooled-connection
+  "Closes a pooled database such as is created when using postgres."
+  [db]
+  (.close (:datasource db)))
 
