@@ -46,13 +46,13 @@
   (check-spec-args params)
   (condp = dbtype
     :postgres (let [sn (str "//" domain ":" port "/" dbname)]
-                (pool/make-datasource-spec
-                 {:classname "org.postgresql.Driver"
-                  :subprotocol "postgresql"
-                  :subname sn
-                  :user user
-                  :password password
-                  :dbtype :postgres}))
+                (assoc (pool/make-datasource-spec
+                        {:classname "org.postgresql.Driver"
+                         :subprotocol "postgresql"
+                         :subname sn
+                         :user user
+                         :password password})
+                       :dbtype :postgres))
     :sqlite {:classname   "org.sqlite.JDBC"
              :subprotocol "sqlite"
              :subname     dbname
