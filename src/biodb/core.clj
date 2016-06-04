@@ -1,5 +1,6 @@
 (ns biodb.core
   (:require [clojure.java.jdbc :refer :all]
+            [clojure.edn :as edn]
             [jdbc.pool.c3p0 :as pool]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -35,6 +36,20 @@
   "Takes a database row and returns a hashmap representing the
   biological sequence."
   (fn [q] (:type q)))
+
+(defmethod table-spec :default
+  [q]
+  (vector [:accession :text "PRIMARY KEY"]
+          [:src :text "NOT NULL"]))
+
+(defmethod prep-sequences :default
+  [q]
+  (-> (:coll q)
+      (map #(hash-map :accession (:accession %) :src (pr-str %)))))
+
+(defmethod restore-sequence :default
+  [q]
+  (edn/read-string (:src q)))
 
 (defn db-spec
   "Takes a map of parameters and returns a database spec. Currently
