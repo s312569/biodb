@@ -44,8 +44,7 @@
 
 (defmethod prep-sequences :default
   [q]
-  (-> (:coll q)
-      (map #(hash-map :accession (:accession %) :src (pr-str %)))))
+  (map #(hash-map :accession (:accession %) :src (pr-str %)) (:coll q)))
 
 (defmethod restore-sequence :default
   [q]

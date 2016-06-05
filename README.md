@@ -7,7 +7,7 @@ Some utilities for storing biological sequences in SQL databases.
 Install as:
 
 ```clj
-[biodb "0.1.4"]
+[biodb "0.1.5"]
 ```
 
 Include in project:
@@ -35,12 +35,12 @@ user>
 To create tables use `create-table!` and provide a db spec, a table
 name (can be string or keyword) and a sequence type. The sequence type
 is a dispatch value used by the multimethods `table-spec`,
-`prep-sequence` and `restore-sequence`. These methods need to be
-defined for any sequence type that is to be stored in the
-database. `clj-fasta` and `clj-uniprot`, for example, already have
-these defined (with the values :fasta and :uniprot). For custom types
-just define these multimethods. For example, using the `clj-fasta`
-library:
+`prep-sequence` and `restore-sequence`. Default methods assume an
+:accession field and allow searching on the accession and return the
+entire sequence. These methods can be redefined for custom sequence
+types. For example see `clj-fasta` and `clj-uniprot` (which dispatch
+on :fasta and :uniprot type keywords). For example, using the
+`clj-fasta` library:
 
 ```clj
 clj-fasta.core> (bdb/create-table! dbspec :sequences :fasta)
