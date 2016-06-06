@@ -99,7 +99,7 @@
   table-spec, prep-sequences and restore-sequences. See clj-fasta for
   an example of these methods."
   [db table type coll]
-  (dorun (insert-multi! db table (prep-sequences {:coll coll :type type}) {:transaction? true})))
+  (insert-multi! db table (prep-sequences {:coll coll :type type}) {:transaction? true}))
 
 (defn get-sequences
   "Given a database spec, table name, sequence type and a collection
