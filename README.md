@@ -7,7 +7,7 @@ Some utilities for storing biological sequences in SQL databases.
 Install as:
 
 ```clj
-[biodb "0.1.6"]
+[biodb "0.1.7"]
 ```
 
 Include in project:
@@ -61,7 +61,9 @@ clj-fasta.core>
 
 Get sequences by their accession using `get-sequences` with a
 collection of accessions. Note this does not return a lazy collection
-and relies on the existence of an 'accession' field.
+and relies on the existence of an 'accession' field. To process a
+result set lazily supply a function to operate on the result using the
+:apply-func keyword.
 
 ```clj
 clj-fasta.core> (bdb/get-sequences dbspec :sequences :fasta '("Q96QU6"))
@@ -72,10 +74,13 @@ clj-fasta.core> (bdb/get-sequences dbspec :sequences :fasta '("Q96QU6" "P30483")
  synthase-like protein 1 [Homo sapiens]", :sequence "MFTLPQK ..."}
  {:accession "P30483", :description "HLA class I histocompatibility
  antigen, B-45 alpha chain [Homo sapiens]", :sequence "MRVTAP ..."})
-clj-fasta.core> 
+clj-fasta.core> (bdb/get-sequences dbspec :sequences :fasta '("Q96QU6" "P30483")
+				   :apply-func #(doall (map :accession %)))
+("Q96QU6" "P30483")				   
 ```
 
-For other queries use `query-sequences`:
+For other queries use `query-sequences` which also has a :apply-func
+keyword for lazy processing of result sets:
 
 ```clj
 clj-fasta.core> (bdb/query-sequences dbspec
@@ -87,19 +92,6 @@ clj-fasta.core> (bdb/query-sequences dbspec
  {:accession "Q4AC99", :description "Probable inactive 1-aminocyclopropane-1-carboxylate
  synthase-like protein 2 [Homo sapiens]", :sequence "MSHRSDT ..."})
 clj-fasta.core> 
-```
-
-For lazy processing use `apply-query-sequences` with a function
-argument that will work on a lazy list of all sequences retrieved by
-the query:
-
-```clj
-clj-fasta.core> (bdb/apply-query-sequences dbspec
-                 			   ["select * from sequences"]
-                 			   :fasta
-                 			   #(doall (map :accession %)))
-("P31946" "P62258" "Q04917" "P61981" "P31947" ...)
-clj-fasta.core>
 ```
 
 The whole thing is just a very thin wrapper around clojure.java.jdbc

@@ -107,13 +107,16 @@
   database. Type argument refers to the dispatch argument of the
   multimethods table-spec, prep-sequences and restore-sequences. See
   clj-fasta for an example of these methods."
-  [db table type coll]
+  [db table type coll & {:keys [apply-func] :or {apply-func nil}}]
   (let [t (if (keyword? table) (name table) table)
         qu (str "select * from " t " where accession in ("
                 (->> (repeat (count coll) "?") (interpose ",") (apply str))
                 ")")]
     (query db (apply vector qu coll)
-           {:row-fn #(restore-sequence (assoc % :type type))})))
+           (if-not apply-func
+             {:row-fn #(restore-sequence (assoc % :type type))}
+             {:row-fn #(restore-sequence (assoc % :type type))
+              :result-set-fn apply-func}))))
 
 (defn query-sequences
   "Given a database spec, query vector and sequence type, will return
@@ -121,20 +124,12 @@
   argument refers to the dispatch argument of the multimethods
   table-spec, prep-sequences and restore-sequences. See clj-fasta for
   an example of these methods."
-  [db q type]
+  [db q type & {:keys [apply-func] :or {apply-func nil}}]
   (query db q
-         {:row-fn #(restore-sequence (assoc % :type type))}))
-
-(defn apply-query-sequences
-  "Given a database spec, query vector, sequence type and a function,
-  will apply specified function to a lazy list of results. Type
-  argument refers to the dispatch argument of the multimethods
-  table-spec, prep-sequences and restore-sequences. See clj-fasta for
-  an example of these methods."
-  [db q type func]
-  (query db q
-         {:row-fn #(restore-sequence (assoc % :type type))
-          :result-set-fn func}))
+         (if-not apply-func
+           {:row-fn #(restore-sequence (assoc % :type type))}
+           {:row-fn #(restore-sequence (assoc % :type type))
+            :result-set-fn apply-func})))
 
 (defn close-pooled-connection
   "Closes a pooled database such as is created when using postgres."
