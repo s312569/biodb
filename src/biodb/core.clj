@@ -1,6 +1,9 @@
 (ns biodb.core
   (:require [clojure.java.jdbc :refer :all]
             [clojure.edn :as edn]
+            [clojure.string :as str]
+            [clojure.java.io :as io]
+            [me.raynes.fs :as fs]
             [jdbc.pool.c3p0 :as pool]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -58,19 +61,20 @@
     :or {port "5432" domain "127.0.0.1"}
     :as params}]
   (check-spec-args params)
-  (condp = dbtype
-    :postgres (let [sn (str "//" domain ":" port "/" dbname)]
-                (assoc (pool/make-datasource-spec
-                        {:classname "org.postgresql.Driver"
-                         :subprotocol "postgresql"
-                         :subname sn
-                         :user user
-                         :password password})
-                       :dbtype :postgres))
-    :sqlite {:classname   "org.sqlite.JDBC"
-             :subprotocol "sqlite"
-             :subname     dbname
-             :dbtype :sqlite}))
+  (let [spec (condp = dbtype
+               :postgres (let [sn (str "//" domain ":" port "/" dbname)]
+                           (assoc (pool/make-datasource-spec
+                                   {:classname "org.postgresql.Driver"
+                                    :subprotocol "postgresql"
+                                    :subname sn
+                                    :user user
+                                    :password password})
+                                  :dbtype :postgres))
+               :sqlite {:classname   "org.sqlite.JDBC"
+                        :subprotocol "sqlite"
+                        :subname     dbname
+                        :dbtype :sqlite})]
+    spec))
 
 (defn- binary-fields
   [db type]
@@ -108,15 +112,32 @@
   multimethods table-spec, prep-sequences and restore-sequences. See
   clj-fasta for an example of these methods."
   [db table type coll & {:keys [apply-func] :or {apply-func nil}}]
-  (let [t (if (keyword? table) (name table) table)
-        qu (str "select * from " t " where accession in ("
-                (->> (repeat (count coll) "?") (interpose ",") (apply str))
-                ")")]
-    (query db (apply vector qu coll)
-           (if-not apply-func
-             {:row-fn #(restore-sequence (assoc % :type type))}
-             {:row-fn #(restore-sequence (assoc % :type type))
-              :result-set-fn apply-func}))))
+  (if (> (count coll) 100)
+    (let [t (if (keyword? table) (name table) table)
+          tt (str (gensym))
+          qu (str "select * from " t " inner join " tt " on " t ".accession=" tt ".accession")]
+      (try
+        (with-db-transaction [con db]
+          (condp = (:dbtype db)
+            :postgres (let [tfile (fs/temp-file "ids")]
+                        (with-open [w (io/writer tfile)] (doseq [i (set coll)] (.write w (str i "\n"))))
+                        (execute! con [(str "create temp table " tt " (accession text) on commit drop")])
+                        (execute! con [(str "copy " tt " from '" tfile "'")]))
+            :sqlite (do
+                      (execute! con [(str "create temp table " tt " (accession text)")])
+                      (insert-multi! con tt (map #(hash-map :accession %) (set coll)))))
+          (query con qu (if-not apply-func
+                          {:row-fn #(restore-sequence (assoc % :type type))}
+                          {:row-fn #(restore-sequence (assoc % :type type))
+                           :result-set-fn apply-func})))))
+    (let [t (if (keyword? table) (name table) table)
+          qu (str "select * from " t " where accession in ("
+                  (->> (repeat (count coll) "?") (interpose ",") (apply str))
+                  ")")]
+      (query db (apply vector qu coll) (if-not apply-func
+                                         {:row-fn #(restore-sequence (assoc % :type type))}
+                                         {:row-fn #(restore-sequence (assoc % :type type))
+                                          :result-set-fn apply-func})))))
 
 (defn query-sequences
   "Given a database spec, query vector and sequence type, will return
