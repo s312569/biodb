@@ -4,6 +4,7 @@
             [clojure.string :as str]
             [clojure.java.io :as io]
             [me.raynes.fs :as fs]
+            [taoensso.nippy :as nip]
             [jdbc.pool.c3p0 :as pool]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -21,6 +22,16 @@
            (nil? (:user m))
            (nil? (:password m)))
     (throw (Exception. "Must specify a valid user and password."))))
+
+(defn freeze
+  "Uses the Nippy library to serialise a data structure."
+  [obj]
+  (nip/freeze obj))
+
+(defn thaw
+  [obj]
+  "Deserialises an object frozen with the freeze function."
+  (nip/thaw obj))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; api
