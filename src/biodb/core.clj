@@ -168,3 +168,7 @@
   [db]
   (.close (:datasource db)))
 
+(defmacro with-transaction
+  "Perform multiple operations within a transaction."
+  [binding & body]
+  `(with-db-transaction ~binding ~@body))
