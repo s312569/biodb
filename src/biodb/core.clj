@@ -157,11 +157,18 @@
   table-spec, prep-sequences and restore-sequences. See clj-fasta for
   an example of these methods."
   [db q type & {:keys [apply-func] :or {apply-func nil}}]
-  (query db q
-         (if-not apply-func
-           {:row-fn #(restore-sequence (assoc % :type type))}
-           {:row-fn #(restore-sequence (assoc % :type type))
-            :result-set-fn apply-func})))
+  (query db q (if-not apply-func
+                {:row-fn #(restore-sequence (assoc % :type type))}
+                {:row-fn #(restore-sequence (assoc % :type type))
+                 :result-set-fn apply-func})))
+
+(defn do-command
+  "Performs a general (non-select) sql command. Takes a vector
+  containing sql and optional parameters and options map. Thin wrapper
+  around JDBC execute!  command."
+  ([db q] (do-command db q nil))
+  ([db q opts]
+   (execute! db q opts)))
 
 (defn close-pooled-connection
   "Closes a pooled database such as is created when using postgres."
