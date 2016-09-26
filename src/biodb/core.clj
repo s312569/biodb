@@ -116,17 +116,62 @@
   [db table type coll]
   (insert-multi! db table (prep-sequences {:coll coll :type type}) {:transaction? true}))
 
+(defn- large-query
+  [t tt {:keys [apply-func where select join offset order limit parameters]
+         :or {apply-func nil where nil select nil join nil
+              offset nil order nil limit nil parameters nil}}]
+  (-> (cons (str "select "
+                 (if select
+                   (->> (map name select) (interpose ",") (apply str))
+                   "*")
+                 " from " t " "
+                 (if join join)
+                 " inner join " tt " on " t ".accession=" tt ".accession"
+                 (if where (str " where " where))
+                 (if order (str " order by " (name order)))
+                 (if offset " offset ?")
+                 (if limit " limit ? "))
+            (concat parameters (->> [(or offset)
+                                     (or limit)]
+                                    (remove nil?))))
+      vec))
+
+(defn- small-query
+  [t coll {:keys [apply-func where select join offset order limit parameters]
+           :or {apply-func nil where nil select nil join nil
+                offset nil order nil limit nil parameters nil}}]
+  (-> (cons (str "select "
+                 (if select
+                   (->> (map name select) (interpose ",") (apply str))
+                   "*")
+                 " from " t " "
+                 (if join join)
+                 " where " t ".accession in ("
+                 (->> (repeat (count coll) "?") (interpose ",") (apply str))
+                 ")"
+                 (if where (str " and " where))
+                 (if order (str " order by " (name order)))
+                 (if offset " offset ?")
+                 (if limit " limit ?"))
+            (concat coll parameters (->> [(or offset)
+                                          (or limit)]
+                                         (remove nil?))))
+      vec))
+
 (defn get-sequences
   "Given a database spec, table name, sequence type and a collection
   of accessions, will return corresponding sequences from the
   database. Type argument refers to the dispatch argument of the
   multimethods table-spec, prep-sequences and restore-sequences. See
   clj-fasta for an example of these methods."
-  [db table type coll & {:keys [apply-func] :or {apply-func nil}}]
+  [db table type coll & {:keys [apply-func where select join offset order limit parameters]
+                         :or {apply-func nil where nil select nil join nil
+                              offset nil order nil limit nil parameters nil}
+                         :as m}]
   (if (> (count coll) 100)
-    (let [t (if (keyword? table) (name table) table)
+    (let [t (name table)
           tt (str (gensym))
-          qu (str "select * from " t " inner join " tt " on " t ".accession=" tt ".accession")]
+          qu (large-query t tt m)]
       (try
         (with-db-transaction [con db]
           (condp = (:dbtype db)
@@ -142,13 +187,11 @@
                           {:row-fn #(restore-sequence (assoc % :type type))
                            :result-set-fn apply-func})))))
     (let [t (if (keyword? table) (name table) table)
-          qu (str "select * from " t " where accession in ("
-                  (->> (repeat (count coll) "?") (interpose ",") (apply str))
-                  ")")]
-      (query db (apply vector qu coll) (if-not apply-func
-                                         {:row-fn #(restore-sequence (assoc % :type type))}
-                                         {:row-fn #(restore-sequence (assoc % :type type))
-                                          :result-set-fn apply-func})))))
+          qu (small-query t coll m)]
+      (query db qu (if-not apply-func
+                     {:row-fn #(restore-sequence (assoc % :type type))}
+                     {:row-fn #(restore-sequence (assoc % :type type))
+                      :result-set-fn apply-func})))))
 
 (defn query-sequences
   "Given a database spec, query vector and sequence type, will return
@@ -156,7 +199,9 @@
   argument refers to the dispatch argument of the multimethods
   table-spec, prep-sequences and restore-sequences. See clj-fasta for
   an example of these methods."
-  [db q type & {:keys [apply-func] :or {apply-func nil}}]
+  [db q type & {:keys [apply-func where select join offset order limit parameters]
+                :or {apply-func nil where nil select nil join nil
+                     offset nil order nil limit nil parameters nil}}]
   (query db q (if-not apply-func
                 {:row-fn #(restore-sequence (assoc % :type type))}
                 {:row-fn #(restore-sequence (assoc % :type type))
