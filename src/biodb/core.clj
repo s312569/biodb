@@ -114,7 +114,8 @@
   table-spec, prep-sequences and restore-sequences. See clj-fasta for
   an example of these methods."
   [db table type coll]
-  (insert-multi! db table (prep-sequences {:coll coll :type type}) {:transaction? true}))
+  (insert-multi! db table (prep-sequences {:coll coll :type type}) {:transaction? true})
+  true)
 
 (defn- large-query
   [t tt {:keys [apply-func where select join offset order limit parameters]
