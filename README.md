@@ -7,7 +7,7 @@ Some utilities for storing biological sequences in SQL databases.
 Install as:
 
 ```clj
-[biodb "0.2.3"]
+[biodb "0.2.4"]
 ```
 
 Include in project:

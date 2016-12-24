@@ -113,9 +113,10 @@
   argument refers to the dispatch argument of the multimethods
   table-spec, prep-sequences and restore-sequences. See clj-fasta for
   an example of these methods."
-  [db table type coll]
-  (insert-multi! db table (prep-sequences {:coll coll :type type}) {:transaction? true})
-  true)
+  ([db table type coll] (insert-sequences! db table type coll false))
+  ([db table type coll return]
+   (let [a (insert-multi! db table (prep-sequences {:coll coll :type type}) {:transaction? true})]
+     (if return a true))))
 
 (defn- large-query
   [t tt {:keys [apply-func where select join offset order limit parameters]
